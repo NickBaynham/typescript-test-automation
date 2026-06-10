@@ -141,3 +141,8 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Local agent instructions and planning (not committed)
+AGENTS.md
+CLAUDE.md
+planning/
