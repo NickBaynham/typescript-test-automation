@@ -1,0 +1,3 @@
+# Checkout uses LF on every platform (including Windows runners and clones):
+# Prettier enforces LF, so CRLF checkouts would fail the format gate.
+* text=auto eol=lf
