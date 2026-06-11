@@ -24,7 +24,7 @@ export function createLogger(
       if (levelOrder.indexOf(entryLevel) < threshold) {
         return;
       }
-      write(JSON.stringify({ level: entryLevel, message, ...context }));
+      write(JSON.stringify({ ...context, level: entryLevel, message }));
     };
   };
   return { debug: emit('debug'), info: emit('info'), warn: emit('warn'), error: emit('error') };

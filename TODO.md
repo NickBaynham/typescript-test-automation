@@ -4,12 +4,7 @@ Planned work, in phase order. See planning/plan.md (local) for full task sequenc
 
 ## Phase 1 - React UI Testing with Playwright
 
-- Playwright with browser installation in the Makefile.
-- Page object pattern with React-friendly selectors (role and test-id based).
-- UI target settings (base URLs per environment) in the configuration module.
-- Sample React application in docker compose; `make docker-build`, `make docker-run`, `make docker-up`, `make docker-down`.
-- Allure reporting and a `make report` target.
-- GitHub Actions pipeline: lint, types, tests with coverage, security audit, Docker build, Allure artifacts; consider a Windows runner to exercise the native Windows path.
+- Verify the CI pipeline passes on the first push to GitHub (the one remaining Phase 1 DoD item).
 
 ## Phase 2 - REST API Testing
 

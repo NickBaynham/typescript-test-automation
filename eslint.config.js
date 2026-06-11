@@ -4,7 +4,7 @@ import security from 'eslint-plugin-security';
 import prettier from 'eslint-config-prettier';
 
 export default defineConfig(
-  globalIgnores(['dist/', 'coverage/']),
+  globalIgnores(['dist/', 'coverage/', 'sample-app/']),
   {
     files: ['**/*.ts'],
     extends: [
