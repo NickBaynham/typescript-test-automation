@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { joinUrl } from '../urls.js';
 
 type Role = Parameters<Page['getByRole']>[0];
 type RoleOptions = Parameters<Page['getByRole']>[1];
@@ -16,9 +17,9 @@ export abstract class BasePage {
     readonly path: string,
   ) {}
 
-  /** Navigates to this page under the given base URL. */
+  /** Navigates to this page under the given base URL (path prefixes preserved). */
   async goto(baseUrl: string): Promise<void> {
-    await this.page.goto(new URL(this.path, baseUrl).toString());
+    await this.page.goto(joinUrl(baseUrl, this.path));
   }
 
   /** Locates by ARIA role and accessible name: the primary convention. */

@@ -85,10 +85,18 @@ describe('browsers file', () => {
 
   test.each([
     ['not JSON at all', 'nonsense'],
+    ['truncated file', '{"browsers": [{"name": "chro'],
     ['wrong shape', '{"browsers": "yes"}'],
     ['unknown browser name', '{"browsers":[{"name":"opera","kind":"engine","available":true}]}'],
   ])('parseBrowsersFile rejects %s with BrowsersFileError', (_case, content) => {
     expect(() => parseBrowsersFile(content)).toThrow(BrowsersFileError);
+  });
+
+  test.each([
+    ['invalid JSON', 'nonsense'],
+    ['malformed content', '{"browsers": "yes"}'],
+  ])('parseBrowsersFile tells the user how to regenerate after %s', (_case, content) => {
+    expect(() => parseBrowsersFile(content)).toThrow('make install-browsers');
   });
 
   test('BrowsersFileError carries its class name for structured logs', () => {

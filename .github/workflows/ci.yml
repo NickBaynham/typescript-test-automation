@@ -46,16 +46,13 @@ jobs:
       - name: Install browser system dependencies
         run: pnpm exec playwright install-deps
 
-      - name: Build sample application image
+      - name: Build sample application and API images
         run: make docker-build
 
-      - name: Start sample application
+      - name: Start sample application and API (waits on healthchecks)
         run: make docker-up
 
-      - name: Wait for sample application
-        run: curl --retry 15 --retry-delay 1 --retry-connrefused -sf http://localhost:3000
-
-      - name: Unit and e2e tests with coverage enforcement
+      - name: Unit, integration, and e2e tests with coverage enforcement
         run: make test
 
       - name: Security audit

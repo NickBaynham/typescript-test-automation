@@ -48,20 +48,23 @@ export function buildBrowsersFile(
   };
 }
 
+const regenerateHint =
+  'regenerate with make install-browsers (or: pnpm build && pnpm install:browsers)';
+
 /** Parses and validates browsers.json content. */
 export function parseBrowsersFile(content: string): BrowsersFile {
   let raw: unknown;
   try {
     raw = JSON.parse(content);
   } catch {
-    throw new BrowsersFileError('browsers file is not valid JSON');
+    throw new BrowsersFileError(`browsers file is not valid JSON; ${regenerateHint}`);
   }
   const parsed = browsersFileSchema.safeParse(raw);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
       .join('; ');
-    throw new BrowsersFileError(`browsers file is malformed: ${issues}`);
+    throw new BrowsersFileError(`browsers file is malformed: ${issues}; ${regenerateHint}`);
   }
   return parsed.data;
 }

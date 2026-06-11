@@ -1,5 +1,27 @@
 # Changelog
 
+## Phase 2 - REST API Testing (2026-06-10)
+
+All tasks complete. No new runtime or dev dependencies: the client is native fetch, deep equality is node:util, validation is the existing Zod.
+
+### Added
+
+- Typed HTTP client (`src/api.ts`): base URL from configuration, default headers, bearer auth, timeout, injectable fetch for unit tests, and a Zod-validated declarative call model dispatched via `send`.
+- Response assertions (`src/assertions.ts`): `assertStatus`, `assertJson`, `assertJsonContains`, and `assertMatchesSchema` (Zod; reports every violation and returns the typed payload). All failures carry diagnostic context.
+- API target configuration: `API_BASE_URL` with the docker default `http://localhost:8100`; required in remote mode.
+- Sample REST API (`sample-api/`): zero-dependency Node items service (health, CRUD), non-root container; in-memory until Phase 3 moves storage to MongoDB.
+- Integration suite (`tests/integration/`) running through the platform's own client and assertions against the dockerized API; `make test` now runs unit, integration, and e2e.
+
+### Changed (closing review)
+
+- URL joining (`src/urls.ts`) preserves base path prefixes (https://host/v1 + /items) in both the API client and page objects; invalid declarative calls reject with `ApiError`; sample API handles request stream errors and allows CORS PUT; the API healthcheck carries a client-side timeout; integration test files run sequentially.
+
+### Changed
+
+- Parity items from the Python twin applied: corrupt browsers.json now tells the user how to regenerate (P1); remote mode requires every target URL from one central list (P2); compose services gained healthchecks with fast startup probes and `docker:up --wait` replaced the CI curl loop (P4); the absence-assertion discipline is documented (P5). P3 (browser caching) had landed in the Phase 1 closing review.
+- Default ports adopted from the Python twin to avoid common dev collisions: sample app 3100 (was 3000), sample API 8100.
+- `PLATFORM_ENV` is now a free-form, non-empty environment label; `TARGET_MODE` alone selects dockerized vs remote targets.
+
 ## Phase 1 - React UI Testing with Playwright (2026-06-10)
 
 All tasks complete. Definition of Done verified locally; CI pipeline verification pending the first push to GitHub.

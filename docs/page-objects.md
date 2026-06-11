@@ -51,6 +51,10 @@ CSS and XPath selectors are not part of the pattern. If no convention can reach 
 - Page objects hold no mutable state and make no assertions.
 - Every page object ships with unit tests (see `tests/unit/base-page.test.ts` for the stub-page approach).
 
+## Assertion discipline
+
+Never assert only the absence of an element: absence checks pass before the application has reacted, so they prove nothing on their own. Anchor on a positive state change first (the welcome message appeared, the row count changed), then assert the absence alongside it.
+
 ## Pointing tests at a target
 
 The base URL comes from environment configuration (`loadConfig().ui.baseUrl`), not from page objects. For the dockerized sample app no variables are needed; for a remote hosted target set `TARGET_MODE=remote` and `UI_BASE_URL=https://your-target.example.com`. See the Configuration section of the README.

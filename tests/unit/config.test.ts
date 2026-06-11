@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { ConfigError, loadConfig } from '../../src/config.js';
+import { ConfigError, loadConfig, type PlatformConfig } from '../../src/config.js';
 
 describe('loadConfig', () => {
   test('returns defaults when no variables are set', () => {
@@ -9,44 +9,80 @@ describe('loadConfig', () => {
       environment: 'local',
       targetMode: 'docker',
       logLevel: 'info',
-      ui: { baseUrl: 'http://localhost:3000' },
+      ui: { baseUrl: 'http://localhost:3100' },
+      api: { baseUrl: 'http://localhost:8100' },
     });
   });
 
   test('reads settings from environment variables', () => {
     const config = loadConfig({
-      PLATFORM_ENV: 'ci',
+      PLATFORM_ENV: 'staging-eu',
       TARGET_MODE: 'remote',
       LOG_LEVEL: 'debug',
       UI_BASE_URL: 'https://staging.example.com',
+      API_BASE_URL: 'https://api.staging.example.com',
     });
 
     expect(config).toEqual({
-      environment: 'ci',
+      environment: 'staging-eu',
       targetMode: 'remote',
       logLevel: 'debug',
       ui: { baseUrl: 'https://staging.example.com' },
+      api: { baseUrl: 'https://api.staging.example.com' },
     });
   });
 
-  test('UI_BASE_URL overrides the docker default', () => {
-    const config = loadConfig({ UI_BASE_URL: 'http://localhost:8080' });
-
-    expect(config.ui.baseUrl).toBe('http://localhost:8080');
-  });
-
-  test('requires UI_BASE_URL when the target mode is remote', () => {
-    expect(() => loadConfig({ TARGET_MODE: 'remote' })).toThrow(ConfigError);
-    expect(() => loadConfig({ TARGET_MODE: 'remote' })).toThrow('UI_BASE_URL');
-  });
-
-  test('rejects a malformed UI_BASE_URL', () => {
-    expect(() => loadConfig({ UI_BASE_URL: 'not-a-url' })).toThrow(ConfigError);
-    expect(() => loadConfig({ UI_BASE_URL: 'not-a-url' })).toThrow('UI_BASE_URL');
+  test('PLATFORM_ENV is a free-form label but must not be empty', () => {
+    expect(loadConfig({ PLATFORM_ENV: 'my-perf-rig' }).environment).toBe('my-perf-rig');
+    expect(() => loadConfig({ PLATFORM_ENV: '' })).toThrow(ConfigError);
   });
 
   test.each([
-    ['PLATFORM_ENV', { PLATFORM_ENV: 'staging' }],
+    [
+      'UI_BASE_URL',
+      { UI_BASE_URL: 'http://localhost:9999' },
+      (config: PlatformConfig) => config.ui.baseUrl,
+    ],
+    [
+      'API_BASE_URL',
+      { API_BASE_URL: 'http://localhost:9999' },
+      (config: PlatformConfig) => config.api.baseUrl,
+    ],
+  ])('%s overrides the docker default', (_name, env, read) => {
+    expect(read(loadConfig(env))).toBe('http://localhost:9999');
+  });
+
+  test('remote target mode requires every target URL explicitly', () => {
+    expect(() => loadConfig({ TARGET_MODE: 'remote' })).toThrow(ConfigError);
+    expect(() => loadConfig({ TARGET_MODE: 'remote' })).toThrow(/UI_BASE_URL.*API_BASE_URL/);
+  });
+
+  test('remote target mode names only the missing URLs', () => {
+    const env = { TARGET_MODE: 'remote', UI_BASE_URL: 'https://app.example.com' };
+
+    expect(() => loadConfig(env)).toThrow('API_BASE_URL');
+    expect(() => loadConfig(env)).not.toThrow(/UI_BASE_URL/);
+  });
+
+  test('remote target mode passes when every target URL is set', () => {
+    const config = loadConfig({
+      TARGET_MODE: 'remote',
+      UI_BASE_URL: 'https://app.example.com',
+      API_BASE_URL: 'https://api.example.com',
+    });
+
+    expect(config.targetMode).toBe('remote');
+  });
+
+  test.each([
+    ['UI_BASE_URL', { UI_BASE_URL: 'not-a-url' }],
+    ['API_BASE_URL', { API_BASE_URL: 'also not a url' }],
+  ])('rejects a malformed %s', (variable, env) => {
+    expect(() => loadConfig(env)).toThrow(ConfigError);
+    expect(() => loadConfig(env)).toThrow(variable);
+  });
+
+  test.each([
     ['TARGET_MODE', { TARGET_MODE: 'kubernetes' }],
     ['LOG_LEVEL', { LOG_LEVEL: 'verbose' }],
   ])('throws ConfigError naming %s when its value is invalid', (variable, env) => {
@@ -56,7 +92,7 @@ describe('loadConfig', () => {
 
   test('ConfigError carries its class name for structured logs', () => {
     try {
-      loadConfig({ PLATFORM_ENV: 'staging' });
+      loadConfig({ TARGET_MODE: 'bogus' });
       expect.unreachable('loadConfig should have thrown');
     } catch (error) {
       expect((error as Error).name).toBe('ConfigError');

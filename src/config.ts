@@ -6,20 +6,26 @@ export class ConfigError extends Error {
 }
 
 const envSchema = z.object({
-  PLATFORM_ENV: z.enum(['local', 'ci', 'remote']).default('local'),
+  PLATFORM_ENV: z.string().min(1).default('local'),
   TARGET_MODE: z.enum(['docker', 'remote']).default('docker'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   UI_BASE_URL: z.url().optional(),
+  API_BASE_URL: z.url().optional(),
 });
 
-const dockerUiBaseUrl = 'http://localhost:3000';
+const dockerDefaults = {
+  UI_BASE_URL: 'http://localhost:3100',
+  API_BASE_URL: 'http://localhost:8100',
+};
 
 /** Platform settings resolved from environment variables. */
 export interface PlatformConfig {
-  readonly environment: 'local' | 'ci' | 'remote';
+  /** Free-form environment label (local, ci, staging-eu, ...); informational. */
+  readonly environment: string;
   readonly targetMode: 'docker' | 'remote';
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error';
   readonly ui: { readonly baseUrl: string };
+  readonly api: { readonly baseUrl: string };
 }
 
 /** Parses platform configuration from environment variables, applying defaults. */
@@ -33,16 +39,28 @@ export function loadConfig(
       .join('; ');
     throw new ConfigError(`Invalid environment configuration: ${issues}`);
   }
-  const { PLATFORM_ENV, TARGET_MODE, LOG_LEVEL, UI_BASE_URL } = parsed.data;
-  if (TARGET_MODE === 'remote' && UI_BASE_URL === undefined) {
-    throw new ConfigError(
-      'Invalid environment configuration: UI_BASE_URL is required when TARGET_MODE is remote',
-    );
+  const { PLATFORM_ENV, TARGET_MODE, LOG_LEVEL } = parsed.data;
+  if (TARGET_MODE === 'remote') {
+    // The central list of target URLs that must be explicit in remote mode so
+    // localhost defaults never leak into a remote run. Phase 3 adds MONGO_URL.
+    const remoteRequired = new Map<string, string | undefined>([
+      ['UI_BASE_URL', parsed.data.UI_BASE_URL],
+      ['API_BASE_URL', parsed.data.API_BASE_URL],
+    ]);
+    const missing = [...remoteRequired]
+      .filter(([, value]) => value === undefined)
+      .map(([name]) => name);
+    if (missing.length > 0) {
+      throw new ConfigError(
+        `remote target mode requires explicit values for: ${missing.join(', ')}`,
+      );
+    }
   }
   return {
     environment: PLATFORM_ENV,
     targetMode: TARGET_MODE,
     logLevel: LOG_LEVEL,
-    ui: { baseUrl: UI_BASE_URL ?? dockerUiBaseUrl },
+    ui: { baseUrl: parsed.data.UI_BASE_URL ?? dockerDefaults.UI_BASE_URL },
+    api: { baseUrl: parsed.data.API_BASE_URL ?? dockerDefaults.API_BASE_URL },
   };
 }

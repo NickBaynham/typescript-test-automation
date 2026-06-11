@@ -2,4 +2,30 @@ services:
   sample-app:
     build: ./sample-app
     ports:
-      - '${SAMPLE_APP_PORT:-3000}:8080'
+      - '${SAMPLE_APP_PORT:-3100}:8080'
+    healthcheck:
+      # 127.0.0.1, not localhost: Alpine resolves localhost to ::1 first and
+      # nginx listens on IPv4 only. Probe fast during startup only;
+      # steady-state backs off to 30s.
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/']
+      start_period: 30s
+      start_interval: 2s
+      interval: 30s
+      timeout: 2s
+      retries: 3
+
+  sample-api:
+    build: ./sample-api
+    ports:
+      - '${SAMPLE_API_PORT:-8100}:8100'
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8100/health', { signal: AbortSignal.timeout(1500) }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      start_period: 30s
+      start_interval: 2s
+      interval: 30s
+      timeout: 2s
+      retries: 3

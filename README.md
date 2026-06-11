@@ -1,6 +1,6 @@
 # typescript-test-automation
 
-A TypeScript based software test automation platform, built in phases. Current capability: React UI testing with Playwright against dockerized or remote hosted targets, host-aware browser installation, page objects with React-suited locator conventions, Allure reporting, and a cross-platform CI pipeline. REST API testing (Phase 2) and MongoDB testing (Phase 3) follow.
+A TypeScript based software test automation platform, built in phases. Current capability: React UI testing with Playwright (page objects, host-aware browser installation, Allure reporting) and REST API testing (typed fetch client, Zod response validation) against dockerized or remote hosted targets, with a cross-platform CI pipeline. MongoDB testing (Phase 3) follows.
 
 ## Project Layout
 
@@ -9,8 +9,9 @@ src/                Platform code (the test automation framework itself)
 src/pages/          Page objects (BasePage plus per-application pages)
 tests/unit/         Unit tests of platform code
 tests/e2e/          End-to-end tests against the application under test
-tests/integration/  Integration tests against target applications (Phase 2+)
+tests/integration/  Integration tests against the API under test
 sample-app/         Dockerized reference React application
+sample-api/         Dockerized reference REST API (in-memory items service)
 docs/               How-to documentation
 config/             Generated browser availability (git ignored)
 dist/               Compiled output (generated)
@@ -44,23 +45,24 @@ make docker-down
 
 Every command exists as a package.json script; the Makefile is a thin wrapper. The two columns below are equivalent, so use whichever fits your platform.
 
-| Make                    | pnpm                                      | Purpose                                                                                      |
-| ----------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `make install`          | `pnpm install`                            | Install dependencies                                                                         |
-| `make lint`             | `pnpm lint`                               | ESLint (with security rules), Prettier check, tsc                                            |
-| `make format`           | `pnpm format`                             | Apply Prettier formatting                                                                    |
-| `make test`             | `pnpm test`                               | Unit tests with coverage, then e2e against the sample app (start it first: `make docker-up`) |
-| -                       | `pnpm test:unit`                          | Unit tests with coverage only (90 percent threshold)                                         |
-| `make build`            | `pnpm build`                              | Compile TypeScript to dist/                                                                  |
-| `make run`              | `pnpm start`                              | Run the compiled platform (make builds first)                                                |
-| `make security`         | `pnpm security`                           | Audit dependencies for known vulnerabilities                                                 |
-| -                       | `pnpm test:e2e`                           | E2e tests only; emits Allure results and failure artifacts                                   |
-| `make report`           | `pnpm report`                             | Generate the Allure HTML report and open it                                                  |
-| `make install-browsers` | `pnpm build` then `pnpm install:browsers` | Install supported Playwright browsers, detect host browsers, write config/browsers.json      |
-| `make docker-build`     | `pnpm docker:build`                       | Build the sample application image                                                           |
-| `make docker-run`       | `pnpm docker:run`                         | Run the sample application attached                                                          |
-| `make docker-up`        | `pnpm docker:up`                          | Start the sample application detached                                                        |
-| `make docker-down`      | `pnpm docker:down`                        | Stop and remove the compose stack                                                            |
+| Make                    | pnpm                                      | Purpose                                                                                 |
+| ----------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------- |
+| `make install`          | `pnpm install`                            | Install dependencies                                                                    |
+| `make lint`             | `pnpm lint`                               | ESLint (with security rules), Prettier check, tsc                                       |
+| `make format`           | `pnpm format`                             | Apply Prettier formatting                                                               |
+| `make test`             | `pnpm test`                               | Unit, integration, and e2e suites (start the targets first: `make docker-up`)           |
+| -                       | `pnpm test:unit`                          | Unit tests with coverage only (90 percent threshold)                                    |
+| -                       | `pnpm test:integration`                   | API integration tests only                                                              |
+| `make build`            | `pnpm build`                              | Compile TypeScript to dist/                                                             |
+| `make run`              | `pnpm start`                              | Run the compiled platform (make builds first)                                           |
+| `make security`         | `pnpm security`                           | Audit dependencies for known vulnerabilities                                            |
+| -                       | `pnpm test:e2e`                           | E2e tests only; emits Allure results and failure artifacts                              |
+| `make report`           | `pnpm report`                             | Generate the Allure HTML report and open it                                             |
+| `make install-browsers` | `pnpm build` then `pnpm install:browsers` | Install supported Playwright browsers, detect host browsers, write config/browsers.json |
+| `make docker-build`     | `pnpm docker:build`                       | Build the sample application image                                                      |
+| `make docker-run`       | `pnpm docker:run`                         | Run the sample application attached                                                     |
+| `make docker-up`        | `pnpm docker:up`                          | Start the sample application detached                                                   |
+| `make docker-down`      | `pnpm docker:down`                        | Stop and remove the compose stack                                                       |
 
 All code must pass `make lint` and `make test` before a task is considered done.
 
@@ -74,13 +76,18 @@ The platform supports Linux, macOS, and Windows (native and WSL2).
 
 To keep this guarantee, package.json scripts must remain portable: no shell-specific syntax (no `rm -rf`, no inline `VAR=value` assignments); use Node-based tools for file operations.
 
-## Sample Application
+## Sample Applications
 
-`sample-app/` contains the reference React application (Vite, served by unprivileged nginx) that e2e tests target locally and in CI. `make docker-up` publishes it on port 3000. If port 3000 is taken on your machine, pick another port and point the tests at it:
+`make docker-up` starts both reference targets and waits for their healthchecks:
+
+- `sample-app/`: React application (Vite, unprivileged nginx) on port 3100, targeted by the e2e suite.
+- `sample-api/`: REST API (in-memory items service) on port 8100, targeted by the integration suite. Storage moves to MongoDB in Phase 3.
+
+If a default port is taken on your machine, remap it and point the tests at the new port:
 
 ```
-SAMPLE_APP_PORT=3001 make docker-up
-UI_BASE_URL=http://localhost:3001 make test
+SAMPLE_APP_PORT=3200 SAMPLE_API_PORT=8200 make docker-up
+UI_BASE_URL=http://localhost:3200 API_BASE_URL=http://localhost:8200 make test
 ```
 
 ## Configuration
@@ -89,15 +96,16 @@ Platform settings come from environment variables, parsed and validated with Zod
 
 | Variable       | Values                           | Default                                                                   | Purpose                            |
 | -------------- | -------------------------------- | ------------------------------------------------------------------------- | ---------------------------------- |
-| `PLATFORM_ENV` | `local`, `ci`, `remote`          | `local`                                                                   | Selects the environment profile    |
+| `PLATFORM_ENV` | any non-empty label              | `local`                                                                   | Informational environment label    |
 | `TARGET_MODE`  | `docker`, `remote`               | `docker`                                                                  | Dockerized or remote hosted target |
 | `LOG_LEVEL`    | `debug`, `info`, `warn`, `error` | `info`                                                                    | Structured logger threshold        |
-| `UI_BASE_URL`  | any valid URL                    | `http://localhost:3000` when `TARGET_MODE=docker`; required when `remote` | Base URL of the UI under test      |
+| `UI_BASE_URL`  | any valid URL                    | `http://localhost:3100` when `TARGET_MODE=docker`; required when `remote` | Base URL of the UI under test      |
+| `API_BASE_URL` | any valid URL                    | `http://localhost:8100` when `TARGET_MODE=docker`; required when `remote` | Base URL of the API under test     |
 
-To point the e2e suite at a remote hosted application instead of the dockerized sample app:
+Remote mode requires every target URL explicitly, so localhost defaults never leak into a remote run:
 
 ```
-TARGET_MODE=remote UI_BASE_URL=https://your-app.example.com pnpm test:e2e
+TARGET_MODE=remote UI_BASE_URL=https://app.example.com API_BASE_URL=https://api.example.com make test
 ```
 
 ## Continuous Integration
@@ -107,5 +115,6 @@ GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on pu
 ## Further Documentation
 
 - [docs/page-objects.md](docs/page-objects.md) - writing page objects and locator conventions
+- [docs/api-testing.md](docs/api-testing.md) - the API client, assertions, and targeting real APIs
 - [CHANGELOG.md](CHANGELOG.md) - changes and feature list
 - [TODO.md](TODO.md) - planned and in-progress work
