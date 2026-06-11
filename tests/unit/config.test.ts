@@ -11,7 +11,28 @@ describe('loadConfig', () => {
       logLevel: 'info',
       ui: { baseUrl: 'http://localhost:3100' },
       api: { baseUrl: 'http://localhost:8100' },
+      mongo: { url: 'mongodb://localhost:27100', database: 'sampledb' },
     });
+  });
+
+  test('reads Mongo settings from environment variables', () => {
+    const config = loadConfig({
+      MONGO_URL: 'mongodb://db.example.com:27017',
+      MONGO_DATABASE: 'proddb',
+    });
+
+    expect(config.mongo).toEqual({ url: 'mongodb://db.example.com:27017', database: 'proddb' });
+  });
+
+  test('accepts a mongodb+srv MONGO_URL', () => {
+    const config = loadConfig({ MONGO_URL: 'mongodb+srv://cluster.example.mongodb.net/db' });
+
+    expect(config.mongo.url).toContain('mongodb+srv://');
+  });
+
+  test('rejects an empty MONGO_DATABASE', () => {
+    expect(() => loadConfig({ MONGO_DATABASE: '' })).toThrow(ConfigError);
+    expect(() => loadConfig({ MONGO_DATABASE: '' })).toThrow('MONGO_DATABASE');
   });
 
   test('reads settings from environment variables', () => {
@@ -21,6 +42,8 @@ describe('loadConfig', () => {
       LOG_LEVEL: 'debug',
       UI_BASE_URL: 'https://staging.example.com',
       API_BASE_URL: 'https://api.staging.example.com',
+      MONGO_URL: 'mongodb://db.staging.example.com:27017',
+      MONGO_DATABASE: 'stagingdb',
     });
 
     expect(config).toEqual({
@@ -29,6 +52,7 @@ describe('loadConfig', () => {
       logLevel: 'debug',
       ui: { baseUrl: 'https://staging.example.com' },
       api: { baseUrl: 'https://api.staging.example.com' },
+      mongo: { url: 'mongodb://db.staging.example.com:27017', database: 'stagingdb' },
     });
   });
 
@@ -54,7 +78,9 @@ describe('loadConfig', () => {
 
   test('remote target mode requires every target URL explicitly', () => {
     expect(() => loadConfig({ TARGET_MODE: 'remote' })).toThrow(ConfigError);
-    expect(() => loadConfig({ TARGET_MODE: 'remote' })).toThrow(/UI_BASE_URL.*API_BASE_URL/);
+    expect(() => loadConfig({ TARGET_MODE: 'remote' })).toThrow(
+      /UI_BASE_URL.*API_BASE_URL.*MONGO_URL/,
+    );
   });
 
   test('remote target mode names only the missing URLs', () => {
@@ -69,6 +95,7 @@ describe('loadConfig', () => {
       TARGET_MODE: 'remote',
       UI_BASE_URL: 'https://app.example.com',
       API_BASE_URL: 'https://api.example.com',
+      MONGO_URL: 'mongodb://db.example.com:27017',
     });
 
     expect(config.targetMode).toBe('remote');

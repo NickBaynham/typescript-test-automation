@@ -7,3 +7,15 @@ export function joinUrl(baseUrl: string, path: string): string {
   const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
   return new URL(path.replace(/^\//, ''), base).toString();
 }
+
+/** Strips credentials from a URL so it is safe to include in logs and errors. */
+export function redactUrl(raw: string): string {
+  try {
+    const url = new URL(raw);
+    url.username = '';
+    url.password = '';
+    return url.toString();
+  } catch {
+    return '<unparseable url>';
+  }
+}

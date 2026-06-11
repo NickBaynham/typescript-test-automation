@@ -1,12 +1,16 @@
 /**
- * Sample REST API: an items service for platform testing. Storage is in
- * memory for Phase 2; Phase 3 moves it to MongoDB so the full-stack scenario
- * can verify database state behind API effects.
+ * Sample REST API: a MongoDB-backed items service for platform testing.
+ * Storage lives in the `items` collection so the platform's full-stack
+ * scenario can verify database state behind API effects.
  */
-import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
+import { MongoClient, ObjectId } from 'mongodb';
 
-const items = new Map();
+const mongoUrl = process.env.MONGO_URL ?? 'mongodb://localhost:27100';
+const mongoDatabase = process.env.MONGO_DATABASE ?? 'sampledb';
+
+const client = new MongoClient(mongoUrl);
+const items = client.db(mongoDatabase).collection('items');
 
 // Test fixture: the browser-served sample app calls this API cross-origin.
 const corsHeaders = {
@@ -33,12 +37,31 @@ const readBody = (req) =>
     req.on('error', reject);
   });
 
-const server = createServer(async (req, res) => {
+const toItem = (document) => ({ id: String(document._id), name: document.name });
+
+const objectId = (value) => {
+  try {
+    return new ObjectId(value);
+  } catch {
+    return null;
+  }
+};
+
+// A crashed fixture turns every later test failure into connection noise, so
+// unexpected errors (e.g. a database blip) answer 500 instead of killing the
+// process.
+const server = createServer((req, res) => {
+  handle(req, res).catch(() => send(res, 500, { detail: 'internal server error' }));
+});
+
+const handle = async (req, res) => {
   const path = new URL(req.url, 'http://localhost').pathname;
 
   if (req.method === 'OPTIONS') return send(res, 204);
   if (req.method === 'GET' && path === '/health') return send(res, 200, { status: 'ok' });
-  if (req.method === 'GET' && path === '/items') return send(res, 200, [...items.values()]);
+  if (req.method === 'GET' && path === '/items') {
+    return send(res, 200, (await items.find().toArray()).map(toItem));
+  }
 
   if (req.method === 'POST' && path === '/items') {
     let payload;
@@ -50,27 +73,30 @@ const server = createServer(async (req, res) => {
     if (typeof payload?.name !== 'string' || payload.name.length === 0) {
       return send(res, 422, { detail: 'name must be a non-empty string' });
     }
-    const item = { id: randomUUID(), name: payload.name };
-    items.set(item.id, item);
-    return send(res, 201, item);
+    const result = await items.insertOne({ name: payload.name });
+    return send(res, 201, { id: String(result.insertedId), name: payload.name });
   }
 
   const itemMatch = /^\/items\/([^/]+)$/.exec(path);
   if (itemMatch) {
-    const id = itemMatch[1];
+    const id = objectId(itemMatch[1]);
+    if (id === null) return send(res, 404, { detail: 'item not found' });
     if (req.method === 'GET') {
-      const item = items.get(id);
-      return item === undefined
+      const document = await items.findOne({ _id: id });
+      return document === null
         ? send(res, 404, { detail: 'item not found' })
-        : send(res, 200, item);
+        : send(res, 200, toItem(document));
     }
     if (req.method === 'DELETE') {
-      return items.delete(id) ? send(res, 204) : send(res, 404, { detail: 'item not found' });
+      const result = await items.deleteOne({ _id: id });
+      return result.deletedCount === 0
+        ? send(res, 404, { detail: 'item not found' })
+        : send(res, 204);
     }
   }
 
   return send(res, 404, { detail: 'not found' });
-});
+};
 
 server.listen(8100, () => {
   process.stdout.write('sample-api listening on 8100\n');

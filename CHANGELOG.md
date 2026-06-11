@@ -1,5 +1,24 @@
 # Changelog
 
+## Phase 3 - MongoDB Database Testing (2026-06-10)
+
+The platform's final phase: full-stack coverage. One new dependency: the official mongodb driver.
+
+### Added
+
+- MongoDB client layer (`src/db.ts`): `MongoTarget` with configuration-driven, lazy connection management and `ping()`; `MongoSeeder` for per-test data isolation - cleanup deletes exactly what was seeded, never drops collections.
+- Database state assertions: `assertDocumentExists` (returns the document), `assertDocumentAbsent`, `assertFieldValues`, `assertCollectionCount`, all raising `DbAssertionError` with diagnostic context.
+- Mongo settings in configuration: `MONGO_URL` (docker default `mongodb://localhost:27100`, required in remote mode) and `MONGO_DATABASE` (default `sampledb`).
+- MongoDB 8 in docker compose with a mongosh healthcheck; the sample API now stores items in the `items` collection and waits on the database healthcheck.
+- Items section in the sample app (add-item form and list calling the sample API) with an `ItemsPage` page object.
+- The full-stack scenario (`tests/e2e/full-stack.spec.ts`): UI action, API effect, MongoDB state verification, self-cleaning, on every available browser.
+- Database integration tests covering seeding isolation and every state assertion against the dockerized MongoDB.
+- Tester guide (`docs/tester-guide.md`): introduction, per-layer walkthroughs with worked examples drawn from the live suites, test design guidance, and a troubleshooting table.
+
+### Changed (closing review)
+
+- MongoSeeder records partially inserted ids when a bulk write fails midway, preserving the cleanup guarantee; the sample API answers 500 instead of crashing on unexpected errors; the full-stack spec shares one Mongo connection per worker and closes it deterministically; credential-bearing Mongo URLs are redacted in error messages (`redactUrl`); `mongodb+srv` support is pinned by test; port-conflict remapping for `MONGO_PORT` documented.
+
 ## Phase 2 - REST API Testing (2026-06-10)
 
 All tasks complete. No new runtime or dev dependencies: the client is native fetch, deep equality is node:util, validation is the existing Zod.

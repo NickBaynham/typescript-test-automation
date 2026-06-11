@@ -1,6 +1,6 @@
 # typescript-test-automation
 
-A TypeScript based software test automation platform, built in phases. Current capability: React UI testing with Playwright (page objects, host-aware browser installation, Allure reporting) and REST API testing (typed fetch client, Zod response validation) against dockerized or remote hosted targets, with a cross-platform CI pipeline. MongoDB testing (Phase 3) follows.
+A TypeScript based software test automation platform covering the full stack: React UI testing with Playwright (page objects, host-aware browser installation, Allure reporting), REST API testing (typed fetch client, Zod response validation), and MongoDB state verification (seeding with per-test isolation, document assertions) — against dockerized or remote hosted targets, with a cross-platform CI pipeline and a UI-to-API-to-database full-stack scenario.
 
 ## Project Layout
 
@@ -11,7 +11,7 @@ tests/unit/         Unit tests of platform code
 tests/e2e/          End-to-end tests against the application under test
 tests/integration/  Integration tests against the API under test
 sample-app/         Dockerized reference React application
-sample-api/         Dockerized reference REST API (in-memory items service)
+sample-api/         Dockerized reference REST API (MongoDB-backed items service)
 docs/               How-to documentation
 config/             Generated browser availability (git ignored)
 dist/               Compiled output (generated)
@@ -80,27 +80,30 @@ To keep this guarantee, package.json scripts must remain portable: no shell-spec
 
 `make docker-up` starts both reference targets and waits for their healthchecks:
 
-- `sample-app/`: React application (Vite, unprivileged nginx) on port 3100, targeted by the e2e suite.
-- `sample-api/`: REST API (in-memory items service) on port 8100, targeted by the integration suite. Storage moves to MongoDB in Phase 3.
+- `sample-app/`: React application (Vite, unprivileged nginx) on port 3100, targeted by the e2e suite. Its items section calls the sample API.
+- `sample-api/`: MongoDB-backed REST API (items service) on port 8100, targeted by the integration suite.
+- `mongo`: MongoDB 8 on port 27100, the database behind the sample API and the target of database state assertions.
 
 If a default port is taken on your machine, remap it and point the tests at the new port:
 
 ```
-SAMPLE_APP_PORT=3200 SAMPLE_API_PORT=8200 make docker-up
-UI_BASE_URL=http://localhost:3200 API_BASE_URL=http://localhost:8200 make test
+SAMPLE_APP_PORT=3200 SAMPLE_API_PORT=8200 MONGO_PORT=27200 make docker-up
+UI_BASE_URL=http://localhost:3200 API_BASE_URL=http://localhost:8200 MONGO_URL=mongodb://localhost:27200 make test
 ```
 
 ## Configuration
 
 Platform settings come from environment variables, parsed and validated with Zod in `src/config.ts`. Secrets must only ever be provided through environment variables, never committed to code or config files.
 
-| Variable       | Values                           | Default                                                                   | Purpose                            |
-| -------------- | -------------------------------- | ------------------------------------------------------------------------- | ---------------------------------- |
-| `PLATFORM_ENV` | any non-empty label              | `local`                                                                   | Informational environment label    |
-| `TARGET_MODE`  | `docker`, `remote`               | `docker`                                                                  | Dockerized or remote hosted target |
-| `LOG_LEVEL`    | `debug`, `info`, `warn`, `error` | `info`                                                                    | Structured logger threshold        |
-| `UI_BASE_URL`  | any valid URL                    | `http://localhost:3100` when `TARGET_MODE=docker`; required when `remote` | Base URL of the UI under test      |
-| `API_BASE_URL` | any valid URL                    | `http://localhost:8100` when `TARGET_MODE=docker`; required when `remote` | Base URL of the API under test     |
+| Variable         | Values                           | Default                                                                       | Purpose                            |
+| ---------------- | -------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------- |
+| `PLATFORM_ENV`   | any non-empty label              | `local`                                                                       | Informational environment label    |
+| `TARGET_MODE`    | `docker`, `remote`               | `docker`                                                                      | Dockerized or remote hosted target |
+| `LOG_LEVEL`      | `debug`, `info`, `warn`, `error` | `info`                                                                        | Structured logger threshold        |
+| `UI_BASE_URL`    | any valid URL                    | `http://localhost:3100` when `TARGET_MODE=docker`; required when `remote`     | Base URL of the UI under test      |
+| `API_BASE_URL`   | any valid URL                    | `http://localhost:8100` when `TARGET_MODE=docker`; required when `remote`     | Base URL of the API under test     |
+| `MONGO_URL`      | mongodb:// or mongodb+srv:// URL | `mongodb://localhost:27100` when `TARGET_MODE=docker`; required when `remote` | MongoDB under test                 |
+| `MONGO_DATABASE` | any non-empty name               | `sampledb`                                                                    | Database name under test           |
 
 Remote mode requires every target URL explicitly, so localhost defaults never leak into a remote run:
 
@@ -114,7 +117,9 @@ GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs on pu
 
 ## Further Documentation
 
+- [docs/tester-guide.md](docs/tester-guide.md) - the tester guide: automating tests at every layer, design guidance, troubleshooting
 - [docs/page-objects.md](docs/page-objects.md) - writing page objects and locator conventions
 - [docs/api-testing.md](docs/api-testing.md) - the API client, assertions, and targeting real APIs
+- [docs/database-testing.md](docs/database-testing.md) - MongoDB connections, seeding, state assertions, the full-stack scenario
 - [CHANGELOG.md](CHANGELOG.md) - changes and feature list
 - [TODO.md](TODO.md) - planned and in-progress work

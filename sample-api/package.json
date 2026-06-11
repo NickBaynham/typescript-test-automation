@@ -1,0 +1,13 @@
+{
+  "name": "sample-api",
+  "version": "0.1.0",
+  "description": "Reference REST API targeted by the platform's integration tests",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "mongodb": "^7.3.0"
+  }
+}

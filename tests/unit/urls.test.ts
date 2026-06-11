@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { joinUrl } from '../../src/urls.js';
+import { joinUrl, redactUrl } from '../../src/urls.js';
 
 describe('joinUrl', () => {
   test.each([
@@ -31,5 +31,21 @@ describe('joinUrl', () => {
     ],
   ])('%s', (_case, base, path, expected) => {
     expect(joinUrl(base, path)).toBe(expected);
+  });
+});
+
+describe('redactUrl', () => {
+  test('strips credentials so URLs are safe to log', () => {
+    expect(redactUrl('mongodb://admin:s3cr3t@db.example.com:27017')).toBe(
+      'mongodb://db.example.com:27017',
+    );
+  });
+
+  test('leaves credential-free URLs unchanged', () => {
+    expect(redactUrl('mongodb://localhost:27100')).toBe('mongodb://localhost:27100');
+  });
+
+  test('never throws on unparseable input', () => {
+    expect(redactUrl('not a url')).toBe('<unparseable url>');
   });
 });

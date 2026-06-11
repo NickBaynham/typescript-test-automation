@@ -1,6 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
+import type { Document } from 'mongodb';
 import type { ZodType } from 'zod';
 import { ApiError, type ApiResponse } from './api.js';
+import type { MongoTarget } from './db.js';
 
 /**
  * Raised when a response assertion fails. Messages carry enough context to
@@ -57,6 +59,75 @@ export function assertJsonContains(
     throw new ApiAssertionError(
       `payload mismatch for ${mismatched.sort().join(', ')}: ` +
         `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`,
+    );
+  }
+}
+
+/** Raised when a database state assertion fails. */
+export class DbAssertionError extends Error {
+  override name = 'DbAssertionError';
+}
+
+/** Asserts a document matching the query exists; returns it. */
+export async function assertDocumentExists(
+  target: MongoTarget,
+  collection: string,
+  query: Document,
+): Promise<Document> {
+  const document = await target.collection(collection).findOne(query);
+  if (document === null) {
+    throw new DbAssertionError(`no document in '${collection}' matches ${JSON.stringify(query)}`);
+  }
+  return document;
+}
+
+/** Asserts no document matches the query. */
+export async function assertDocumentAbsent(
+  target: MongoTarget,
+  collection: string,
+  query: Document,
+): Promise<void> {
+  const document = await target.collection(collection).findOne(query);
+  if (document !== null) {
+    throw new DbAssertionError(
+      `expected no document in '${collection}' matching ${JSON.stringify(query)}, ` +
+        `found ${JSON.stringify(document)}`,
+    );
+  }
+}
+
+/** Asserts the matching document carries every expected field value. */
+export async function assertFieldValues(
+  target: MongoTarget,
+  collection: string,
+  query: Document,
+  expected: Document,
+): Promise<void> {
+  const document = await assertDocumentExists(target, collection, query);
+  const fields = new Map(Object.entries(document));
+  const mismatched = Object.entries(expected)
+    .filter(([field, value]) => !isDeepStrictEqual(fields.get(field), value))
+    .map(([field]) => field);
+  if (mismatched.length > 0) {
+    throw new DbAssertionError(
+      `field mismatch in '${collection}' for ${mismatched.sort().join(', ')}: ` +
+        `expected ${JSON.stringify(expected)}, got ${JSON.stringify(document)}`,
+    );
+  }
+}
+
+/** Asserts how many documents match the query (all documents when omitted). */
+export async function assertCollectionCount(
+  target: MongoTarget,
+  collection: string,
+  expected: number,
+  query: Document = {},
+): Promise<void> {
+  const actual = await target.collection(collection).countDocuments(query);
+  if (actual !== expected) {
+    throw new DbAssertionError(
+      `expected ${String(expected)} documents in '${collection}' ` +
+        `matching ${JSON.stringify(query)}, got ${String(actual)}`,
     );
   }
 }

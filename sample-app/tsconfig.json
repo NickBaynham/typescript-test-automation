@@ -5,6 +5,7 @@
     "moduleResolution": "bundler",
     "lib": ["es2022", "dom", "dom.iterable"],
     "jsx": "react-jsx",
+    "types": ["vite/client"],
     "strict": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
