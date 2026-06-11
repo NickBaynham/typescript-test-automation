@@ -30,6 +30,19 @@ describe('createLogger', () => {
     expect(JSON.parse(lines[0] ?? '')).toEqual({ level: 'warn', message: 'disk almost full' });
   });
 
+  test('context cannot override the level and message fields', () => {
+    const { lines, write } = capture();
+    const logger = createLogger('info', write);
+
+    logger.info('real message', { level: 'forged', message: 'forged', extra: 1 });
+
+    expect(JSON.parse(lines[0] ?? '')).toEqual({
+      level: 'info',
+      message: 'real message',
+      extra: 1,
+    });
+  });
+
   test('writes newline-terminated lines to stdout by default', () => {
     const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
     const logger = createLogger('info');

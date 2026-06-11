@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    env:
+      PLATFORM_ENV: ci
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: make install
+
+      - name: Lint, format check, type check
+        run: make lint
+
+      - name: Build
+        run: make build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install browsers (host-aware)
+        run: make install-browsers
+
+      - name: Install browser system dependencies
+        run: pnpm exec playwright install-deps
+
+      - name: Build sample application image
+        run: make docker-build
+
+      - name: Start sample application
+        run: make docker-up
+
+      - name: Wait for sample application
+        run: curl --retry 15 --retry-delay 1 --retry-connrefused -sf http://localhost:3000
+
+      - name: Unit and e2e tests with coverage enforcement
+        run: make test
+
+      - name: Security audit
+        run: make security
+
+      - name: Upload Allure results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: allure-results
+          path: allure-results/
+          if-no-files-found: ignore
+
+      - name: Upload failure artifacts (screenshots, traces)
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: failure-artifacts
+          path: test-results/
+          if-no-files-found: ignore
+
+  # Exercises the native Windows path: pnpm scripts without make, browser
+  # detection including per-user installs, and the launch smoke (no Docker:
+  # Windows runners cannot run the Linux sample app container).
+  windows-native:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Lint, format check, type check
+        run: pnpm lint
+
+      - name: Unit tests with coverage enforcement
+        run: pnpm test:unit
+
+      - name: Build
+        run: pnpm build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~\AppData\Local\ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install browsers (host-aware)
+        run: pnpm install:browsers
+
+      - name: Browser launch smoke
+        run: pnpm test:e2e browser-availability

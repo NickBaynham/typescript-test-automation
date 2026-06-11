@@ -142,6 +142,17 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
+# Generated, host-specific browser availability (make install-browsers)
+config/browsers.json
+
+# Playwright output
+test-results/
+playwright-report/
+
+# Allure output
+allure-results/
+allure-report/
+
 # Local agent instructions and planning (not committed)
 AGENTS.md
 CLAUDE.md

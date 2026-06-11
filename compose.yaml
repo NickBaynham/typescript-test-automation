@@ -1,0 +1,5 @@
+services:
+  sample-app:
+    build: ./sample-app
+    ports:
+      - '${SAMPLE_APP_PORT:-3000}:8080'
